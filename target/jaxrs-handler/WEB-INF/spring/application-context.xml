@@ -1,0 +1,104 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:cxf="http://camel.apache.org/schema/cxf"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+	http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context-3.0.xsd
+	http://camel.apache.org/schema/spring
+		http://camel.apache.org/schema/spring/camel-spring.xsd
+	http://camel.apache.org/schema/cxf
+		http://camel.apache.org/schema/cxf/camel-cxf.xsd">
+
+    <import resource="classpath:META-INF/cxf/cxf.xml" />
+    <import resource="classpath:META-INF/cxf/cxf-servlet.xml" />
+    <import resource="classpath:META-INF/cxf/cxf-extension-jaxrs-binding.xml" />
+    <import resource="classpath:META-INF/cxf/cxf-extension-http-jetty.xml" />
+
+
+    <context:component-scan base-package="com.pgs.mhallman.controller" />
+    <context:component-scan base-package="com.pgs.mhallman.processor" />
+    <bean id="personRepository" class="com.pgs.mhallman.repository.PersonRepositoryImpl" />
+
+    <cxf:rsServer id="myRestServer" address="http://localhost:8090/jaxrs-handler/rest">
+        <cxf:serviceBeans>
+            <ref bean="myResource" />
+        </cxf:serviceBeans>
+        <cxf:providers>
+            <bean class="org.codehaus.jackson.jaxrs.JacksonJsonProvider"/>
+        </cxf:providers>
+    </cxf:rsServer>
+
+    <bean id="forced" class="java.lang.IllegalArgumentException">
+        <constructor-arg index="0" value="This is an happy exception :)" />
+    </bean>
+
+    <bean id="webException" class="javax.ws.rs.WebApplicationException">
+        <constructor-arg name="status" value="500" />
+    </bean>
+
+    <bean id="loggingErrorHandler" class="org.apache.camel.builder.LoggingErrorHandlerBuilder">
+        <property name="level" value="INFO" />
+    </bean>
+
+    <bean name="deadLetterChannel" class="org.apache.camel.builder.DeadLetterChannelBuilder">
+        <property name="deadLetterUri" value="direct:deadChannel" />
+        <property name="redeliveryPolicy" ref="redeliveryConfig" />
+    </bean>
+
+    <bean name="redeliveryConfig" class="org.apache.camel.processor.RedeliveryPolicy" >
+        <!-- try redelivery at most 3 times, after that the exchange is dead and its routed to the mock:dead endpoint -->
+        <property name="maximumRedeliveries" value="10"/>
+        <!-- delay 250ms before redelivery -->
+        <property name="redeliveryDelay" value="1000"/>
+    </bean>
+
+
+    <camelContext xmlns="http://camel.apache.org/schema/spring">
+        <!-- Error Handler vs On Exception
+             The first one can handle uncaught exceptions
+             The second one looks for exceptions declared in onException clause !-->
+        <route id="masterRoute" errorHandlerRef="deadLetterChannel">
+            <from uri="cxfrs:bean:myRestServer?bindingStyle=SimpleConsumer" />
+            <choice>
+                <when>
+                    <simple>${header.operationName} == 'getCamelGetPerson'</simple>
+                    <to uri="direct:getCamelGetPerson" />
+                </when>
+                <when>
+                    <simple>${header.operationName} == 'getCamelGetException'</simple>
+                    <to uri="direct:getCamelGetException" />
+                </when>
+                <when>
+                    <simple>${header.operationName} == 'getCamelForcedException</simple>
+                    <to uri="direct:getCamelForcedException" />
+                </when>
+            </choice>
+        </route>
+
+        <route id="getCamelGetPerson">
+            <from uri="direct:getCamelGetPerson" />
+            <process ref="getPersonProcessor" />
+            <to uri="log:body?level=INFO" />
+        </route>
+
+        <route id="getCamelGetException">
+            <from uri="direct:getCamelGetException" />
+            <throwException ref="webException" />
+        </route>
+
+        <route id="getCamelForcedException">
+            <from uri="direct:getCamelForcedException" />
+            <throwException ref="forced" />
+        </route>
+
+        <route id="deadChannel">
+            <from uri="direct:deadChannel" />
+            <log logName="deadLetterNotification" loggingLevel="ERROR" message="Exception going to DeadLetterChannel" />
+            <to uri="mock:dead:channel"/>
+        </route>
+
+    </camelContext>
+
+</beans>
