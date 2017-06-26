@@ -1,5 +1,6 @@
 package com.pgs.mhallman.processor;
 
+import com.pgs.mhallman.domain.FakeException;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
 import org.slf4j.Logger;
@@ -17,5 +18,6 @@ public class DeadLetterChannelProcessor implements Processor {
     @Override
     public void process(Exchange exchange) throws Exception {
         LOG.info("Exception :: {}",exchange.getException().toString());
+        exchange.getIn().setBody(new FakeException("My Fake Server Error", 400, "Problems with server", ":("));
     }
 }

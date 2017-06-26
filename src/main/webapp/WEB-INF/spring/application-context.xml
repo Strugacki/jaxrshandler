@@ -42,24 +42,32 @@
         <property name="level" value="INFO" />
     </bean>
 
-    <bean name="deadLetterChannel" class="org.apache.camel.builder.DeadLetterChannelBuilder">
+    <!-- Bean example !-->
+    <bean name="deadLetterChannelBean" class="org.apache.camel.builder.DeadLetterChannelBuilder">
         <property name="deadLetterUri" value="direct:deadChannel" />
         <property name="redeliveryPolicy" ref="redeliveryConfig" />
     </bean>
 
     <bean name="redeliveryConfig" class="org.apache.camel.processor.RedeliveryPolicy" >
         <!-- try redelivery at most 3 times, after that the exchange is dead and its routed to the mock:dead endpoint -->
-        <property name="maximumRedeliveries" value="10"/>
+        <property name="maximumRedeliveries" value="3"/>
         <!-- delay 250ms before redelivery -->
         <property name="redeliveryDelay" value="1000"/>
+        <property name="retryAttemptedLogLevel" value="INFO"/>
     </bean>
 
 
-    <camelContext xmlns="http://camel.apache.org/schema/spring">
+    <camelContext xmlns="http://camel.apache.org/schema/spring" errorHandlerRef="deadLetterChannel">
         <!-- Error Handler vs On Exception
              The first one can handle uncaught exceptions
              The second one looks for exceptions declared in onException clause !-->
-        <route id="masterRoute" errorHandlerRef="deadLetterChannel">
+
+        <errorHandler id="deadLetterChannel" type="DeadLetterChannel" deadLetterUri="direct:deadChannel"
+                      useOriginalMessage="true" onRedeliveryRef="deadLetterChannelProcessor">
+            <redeliveryPolicy maximumRedeliveries="3" redeliveryDelay="1000" retryAttemptedLogLevel="INFO"/>
+        </errorHandler>
+
+        <route id="masterRoute">
             <from uri="cxfrs:bean:myRestServer?bindingStyle=SimpleConsumer" />
             <choice>
                 <when>
