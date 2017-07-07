@@ -30,9 +30,12 @@
         </cxf:providers>
     </cxf:rsServer>
 
+    <!-- Beans with Exceptions !-->
     <bean id="forced" class="java.lang.IllegalArgumentException">
         <constructor-arg index="0" value="This is an happy exception :)" />
     </bean>
+
+    <bean id="runtimeException" class="java.lang.RuntimeException"/>
 
     <bean id="webException" class="javax.ws.rs.WebApplicationException">
         <constructor-arg name="status" value="500" />
@@ -42,18 +45,21 @@
         <property name="level" value="INFO" />
     </bean>
 
-    <!-- Bean example !-->
+
+    <!-- Bean with DeadLetterChannel !-->
     <bean name="deadLetterChannelBean" class="org.apache.camel.builder.DeadLetterChannelBuilder">
         <property name="deadLetterUri" value="direct:deadChannel" />
         <property name="redeliveryPolicy" ref="redeliveryConfig" />
     </bean>
 
+    <!-- Config for Redelivery !-->
     <bean name="redeliveryConfig" class="org.apache.camel.processor.RedeliveryPolicy" >
         <!-- try redelivery at most 3 times, after that the exchange is dead and its routed to the mock:dead endpoint -->
         <property name="maximumRedeliveries" value="3"/>
         <!-- delay 250ms before redelivery -->
         <property name="redeliveryDelay" value="1000"/>
         <property name="retryAttemptedLogLevel" value="INFO"/>
+        <property name="logExhausted" value="false"/>
     </bean>
 
 
@@ -62,10 +68,35 @@
              The first one can handle uncaught exceptions
              The second one looks for exceptions declared in onException clause !-->
 
-        <errorHandler id="deadLetterChannel" type="DeadLetterChannel" deadLetterUri="direct:deadChannel"
-                      useOriginalMessage="true" onRedeliveryRef="deadLetterChannelProcessor">
+        <errorHandler id="deadLetterChannel" type="DeadLetterChannel" deadLetterUri="direct:deadChannelIn"
+                      onRedeliveryRef="deadLetterChannelInProcessor">
             <redeliveryPolicy maximumRedeliveries="3" redeliveryDelay="1000" retryAttemptedLogLevel="INFO"/>
         </errorHandler>
+
+        <onException>
+            <exception>java.lang.IllegalArgumentException</exception>
+            <!-- If Continued is set to TRUE then Camel will Ignore the fact that the exception was caught
+                 and will continue routing. It will even pass exceptions when you use DeadLetterChannel !-->
+            <continued>
+                <constant>true</constant>
+            </continued>
+        </onException>
+
+        <onException>
+            <exception>java.lang.RuntimeException</exception>
+            <!-- If Handled is set FALSE then routing will NOT break as the exception appears, otherwise it won't try to process routing !-->
+            <handled>
+                <constant>false</constant>
+            </handled>
+        </onException>
+
+        <onException>
+            <exception>javax.ws.rs.WebApplicationException</exception>
+            <!-- If Handled is set TRUE then routing will break as the exception appears, otherwise it will try to process routing !-->
+            <handled>
+                <constant>true</constant>
+            </handled>
+        </onException>
 
         <route id="masterRoute">
             <from uri="cxfrs:bean:myRestServer?bindingStyle=SimpleConsumer" />
@@ -75,36 +106,53 @@
                     <to uri="direct:getCamelGetPerson" />
                 </when>
                 <when>
-                    <simple>${header.operationName} == 'getCamelGetException'</simple>
-                    <to uri="direct:getCamelGetException" />
+                    <simple>${header.operationName} == 'getWebAppException'</simple>
+                    <to uri="direct:getWebAppException"/>
                 </when>
                 <when>
-                    <simple>${header.operationName} == 'getCamelForcedException</simple>
-                    <to uri="direct:getCamelForcedException" />
+                    <simple>${header.operationName} == 'getIllegalArgumentException'</simple>
+                    <to uri="direct:getIllegalArgumentException"/>
+                </when>
+                <when>
+                    <simple>${header.operationName} == 'getRuntimeException'</simple>
+                    <to uri="direct:getRuntimeException"/>
                 </when>
             </choice>
         </route>
 
+        <!-- Routes for APP endpoints !-->
         <route id="getCamelGetPerson">
             <from uri="direct:getCamelGetPerson" />
             <process ref="getPersonProcessor" />
-            <to uri="log:body?level=INFO" />
+            <!--<to uri="log:body?level=INFO" />-->
         </route>
 
-        <route id="getCamelGetException">
-            <from uri="direct:getCamelGetException" />
+        <route id="getWebAppException">
+            <from uri="direct:getWebAppException"/>
             <throwException ref="webException" />
         </route>
 
-        <route id="getCamelForcedException">
-            <from uri="direct:getCamelForcedException" />
+        <route id="getIllegalArgumentException">
+            <from uri="direct:getIllegalArgumentException"/>
             <throwException ref="forced" />
         </route>
 
-        <route id="deadChannel">
-            <from uri="direct:deadChannel" />
+        <route id="getRuntimeException">
+            <from uri="direct:getRuntimeException"/>
+            <throwException ref="runtimeException"/>
+        </route>
+
+        <!-- Dead Letter Channel Routes !-->
+        <route id="deadChannelIn">
+            <from uri="direct:deadChannelIn"/>
             <log logName="deadLetterNotification" loggingLevel="ERROR" message="Exception going to DeadLetterChannel" />
-            <to uri="mock:dead:channel"/>
+            <to uri="direct:deadChannelOut"/>
+        </route>
+
+        <route id="deadChannelOut">
+            <from uri="direct:deadChannelOut"/>
+            <process ref="deadLetterChannelOutProcessor"/>
+            <to uri="log:body?level=INFO"/>
         </route>
 
     </camelContext>

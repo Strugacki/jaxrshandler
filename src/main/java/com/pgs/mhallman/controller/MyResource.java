@@ -60,18 +60,26 @@ public class MyResource {
     }
 
     @GET
-    @Path("/getCamelGetException")
+    @Path("/getWebAppException")
     @Produces(MediaType.APPLICATION_JSON)
-    public Person getCamelGetException(){
-        LOG.info("GetCamelGetException :: hit endpoint");
+    public Person getWebAppException() {
+        LOG.info("GetWebAppException :: hit endpoint");
         return null;
     }
 
     @GET
-    @Path("/getCamelForcedException")
+    @Path("/getIllegalArgumentException")
     @Produces(MediaType.APPLICATION_JSON)
-    public Person getCamelForcedException(){
-        LOG.info("GetCamelForcedException :: hit endpoint");
+    public Person getIllegalArgumentException() {
+        LOG.info("GetIllegalArgumentException :: hit endpoint");
+        return null;
+    }
+
+    @GET
+    @Path("/getRuntimeException")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Person getRuntimeException() {
+        LOG.info("GetRuntimeException :: hit endpoint");
         return null;
     }
 }
