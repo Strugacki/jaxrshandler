@@ -5,6 +5,6 @@ import com.pgs.mhallman.domain.Person;
 
 public interface PersonRepository {
 
-	public Person create();
+	Person create();
 	
 }

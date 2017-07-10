@@ -18,6 +18,5 @@ public class GetExceptionProcessor implements Processor {
     public void process(Exchange exchange) throws Exception {
         LOG.info("GetExceptionProcessor :: start");
         throw new NullPointerException();
-//        LOG.info("GetExceptionProcessor :: end");
     }
 }

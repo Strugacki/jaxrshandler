@@ -52,4 +52,13 @@ public class FakeException {
         this.emoji = emoji;
     }
 
+    @Override
+    public String toString() {
+        return "FakeException{" +
+                "title='" + title + '\'' +
+                ", status=" + status +
+                ", cause='" + cause + '\'' +
+                ", emoji='" + emoji + '\'' +
+                '}';
+    }
 }

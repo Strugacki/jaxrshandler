@@ -17,10 +17,13 @@ public class DeadLetterChannelInProcessor implements Processor {
 
     @Override
     public void process(Exchange exchange) throws Exception {
-        LOG.info("Exception :: " + exchange.getProperty(Exchange.EXCEPTION_CAUGHT).toString());
-        LOG.info("Last Endpoint :: " + exchange.getProperty(Exchange.TO_ENDPOINT).toString());
+        LOG.info("DeadLetterChannelInProcessor :: start");
+        LOG.info("Exception :: {}", exchange.getProperty(Exchange.EXCEPTION_CAUGHT).toString());
+        LOG.info("Last Endpoint :: {}", exchange.getProperty(Exchange.TO_ENDPOINT).toString());
+
         FakeException exception = new FakeException("My Fake Server Error", 400, "Problems with server", ":(");
         exchange.getIn().setBody(exception);
-        LOG.info(exchange.getIn().getBody().toString(), FakeException.class);
+
+        LOG.info("DeadLetterChannelInProcessor :: end");
     }
 }
